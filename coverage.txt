@@ -18,8 +18,8 @@ github.com/autumnsaury/gin-oauth/middleware.go:29.2,32.11 3 1
 github.com/autumnsaury/gin-oauth/middleware.go:37.121,39.2 1 0
 github.com/autumnsaury/gin-oauth/middleware.go:44.61,48.16 3 0
 github.com/autumnsaury/gin-oauth/middleware.go:48.16,51.3 2 0
-github.com/autumnsaury/gin-oauth/middleware.go:51.8,51.77 1 0
-github.com/autumnsaury/gin-oauth/middleware.go:51.77,54.3 2 0
+github.com/autumnsaury/gin-oauth/middleware.go:51.8,51.82 1 0
+github.com/autumnsaury/gin-oauth/middleware.go:51.82,54.3 2 0
 github.com/autumnsaury/gin-oauth/middleware.go:54.8,61.3 6 0
 github.com/autumnsaury/gin-oauth/middleware.go:64.83,66.47 1 2
 github.com/autumnsaury/gin-oauth/middleware.go:66.47,67.40 1 2

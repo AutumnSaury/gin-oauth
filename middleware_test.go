@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
 )
 
@@ -46,7 +47,7 @@ type TokenValidator struct {
 	requiredScopes []string
 }
 
-func (tv TokenValidator) ValidateAccessToken(t *Token) error {
+func (tv TokenValidator) ValidateAccessToken(t *Token, c *gin.Context) error {
 	for _, s := range tv.requiredScopes {
 		if !slices.Contains(t.Scope, s) {
 			return errors.New("permission denied")

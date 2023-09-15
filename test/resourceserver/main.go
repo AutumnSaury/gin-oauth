@@ -47,13 +47,13 @@ func registerAPI(router *gin.Engine) {
 
 	authorized := router.Group("/")
 	// use the Bearer Athentication middleware
-	authorized.Use(oauth.Authorize("mySecretKey-10101", jwt.SigningMethodHS256, TokenValidator{[]string{"user"}}))
+	authorized.Use(oauth.Authorize("mySecretKey-10101", jwt.SigningMethodHS256, tokenValidator{[]string{"user"}}))
 
-	authorized.GET("/customers", GetCustomers)
-	authorized.GET("/customers/:id/orders", GetOrders)
+	authorized.GET("/customers", getCustomers)
+	authorized.GET("/customers/:id/orders", getOrders)
 }
 
-func GetCustomers(c *gin.Context) {
+func getCustomers(c *gin.Context) {
 
 	c.JSON(200, gin.H{
 		"Status":        "verified",
@@ -63,7 +63,7 @@ func GetCustomers(c *gin.Context) {
 	})
 }
 
-func GetOrders(c *gin.Context) {
+func getOrders(c *gin.Context) {
 
 	c.JSON(200, gin.H{
 		"status":          "sent",
@@ -73,11 +73,11 @@ func GetOrders(c *gin.Context) {
 	})
 }
 
-type TokenValidator struct {
+type tokenValidator struct {
 	requiredScopes []string
 }
 
-func (tv TokenValidator) ValidateAccessToken(t *oauth.Token) error {
+func (tv tokenValidator) ValidateAccessToken(t *oauth.Token, c *gin.Context) error {
 	for _, s := range tv.requiredScopes {
 		if !slices.Contains(t.Scope, s) {
 			return errors.New("permission denied")

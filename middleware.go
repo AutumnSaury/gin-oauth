@@ -17,7 +17,7 @@ type BearerAuthentication struct {
 }
 
 type AccessTokenValidator interface {
-	ValidateAccessToken(token *Token) error
+	ValidateAccessToken(token *Token, ctx *gin.Context) error
 }
 
 // NewBearerAuthentication create a BearerAuthentication middleware
@@ -48,7 +48,7 @@ func (ba *BearerAuthentication) Authorize(ctx *gin.Context) {
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, "Not authorized: "+err.Error())
 		ctx.AbortWithStatus(401)
-	} else if err := ba.customValidator.ValidateAccessToken(token); err != nil {
+	} else if err := ba.customValidator.ValidateAccessToken(token, ctx); err != nil {
 		ctx.JSON(http.StatusUnauthorized, "Not authorized: "+err.Error())
 		ctx.AbortWithStatus(401)
 	} else {

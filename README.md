@@ -3,7 +3,7 @@ OAuth 2.0 Authorization Server &amp; Authorization Middleware for [Gin-Gonic](ht
 
 This library offers an OAuth 2.0 Authorization Server based on Gin-Gonic and an Authorization Middleware usable in Resource Servers developed with Gin-Gonic.
 
-This repository is forked from [maxzerbini/oauth](https://github.com/autumnsaury/gin-oauth), making it Go Module compatable and adding built-in JWT to it.
+This repository is forked from [maxzerbini/oauth](https://github.com/autumnsaury/gin-oauth), making it Go Module compatable while adding built-in JWT to it.
 
 ## Authorization Server
 The Authorization Server is implemented by the struct _OAuthBearerServer_ that manages two grant types of authorizations (password and client_credentials). 
