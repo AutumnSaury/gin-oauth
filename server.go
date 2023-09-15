@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	uuid "github.com/gofrs/uuid"
-	"github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 const (

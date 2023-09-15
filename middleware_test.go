@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 var _mut *BearerAuthentication

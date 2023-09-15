@@ -7,7 +7,7 @@ import (
 	oauth "github.com/autumnsaury/gin-oauth"
 	cors "github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 )
 
 /*
