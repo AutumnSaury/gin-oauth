@@ -1,9 +1,12 @@
 package oauth
 
-import "github.com/gin-gonic/gin"
-import "strings"
-import "encoding/base64"
-import "errors"
+import (
+	"encoding/base64"
+	"errors"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+)
 
 // GetBasicAuthentication get username and password from Authorization header
 func GetBasicAuthentication(ctx *gin.Context) (username, password string, err error) {
@@ -31,7 +34,7 @@ func CheckBasicAuthentication(username, password string, ctx *gin.Context) error
 	} else {
 		if u != "" && p != "" {
 			if u != username && p != password {
-				return errors.New("Invalid credentials")
+				return errors.New("invalid credentials")
 			}
 		}
 		return nil

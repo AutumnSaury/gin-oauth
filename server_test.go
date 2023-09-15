@@ -13,12 +13,13 @@ func init() {
 	_sut = NewOAuthBearerServer(
 		"mySecretKey-10101",
 		time.Second*60,
+		time.Hour*24*14,
 		&TestUserVerifier{},
 		nil)
 }
 
 func TestGenerateTokensByUsername(t *testing.T) {
-	token, refresh, err := _sut.generateTokens("user111", "U", "")
+	token, refresh, err := _sut.generateTokens("user111", "U", nil)
 	if err == nil {
 		t.Logf("Token: %v", token)
 		t.Logf("Refresh Token: %v", refresh)
@@ -28,7 +29,7 @@ func TestGenerateTokensByUsername(t *testing.T) {
 }
 
 func TestCryptTokens(t *testing.T) {
-	token, refresh, err := _sut.generateTokens("user222", "U", "")
+	token, refresh, err := _sut.generateTokens("user222", "U", nil)
 	if err == nil {
 		t.Logf("Token: %v", token)
 		t.Logf("Refresh Token: %v", refresh)
@@ -44,7 +45,7 @@ func TestCryptTokens(t *testing.T) {
 }
 
 func TestDecryptRefreshTokens(t *testing.T) {
-	token, refresh, err := _sut.generateTokens("user333", "U", "")
+	token, refresh, err := _sut.generateTokens("user333", "U", nil)
 	if err == nil {
 		t.Logf("Token: %v", token)
 		t.Logf("Refresh Token: %v", refresh)
@@ -58,7 +59,8 @@ func TestDecryptRefreshTokens(t *testing.T) {
 	} else {
 		t.Fatalf("Error %s", err.Error())
 	}
-	refresh2, err := _sut.provider.DecryptRefreshTokens(resp.RefreshToken)
+	refresh2, err := _sut.validateRefreshToken(resp.RefreshToken)
+
 	if err == nil {
 		t.Logf("Refresh Token Decrypted: %v", refresh2)
 	} else {
@@ -104,11 +106,10 @@ func TestRefreshToken4ClientCredentials(t *testing.T) {
 }
 
 // TestUserVerifier provides user credentials verifier for testing.
-type TestUserVerifier struct {
-}
+type TestUserVerifier struct{}
 
 // Validate username and password returning an error if the user credentials are wrong
-func (*TestUserVerifier) ValidateUser(username, password, scope string, req *http.Request) error {
+func (*TestUserVerifier) ValidateUser(username, password string, scope []string, req *http.Request) error {
 	if username == "user111" && password == "password111" {
 		return nil
 	} else if username == "user222" && password == "password222" {
@@ -121,7 +122,7 @@ func (*TestUserVerifier) ValidateUser(username, password, scope string, req *htt
 }
 
 // Validate clientId and secret returning an error if the client credentials are wrong
-func (*TestUserVerifier) ValidateClient(clientId, clientSecret, scope string, req *http.Request) error {
+func (*TestUserVerifier) ValidateClient(clientId, clientSecret string, scope []string, req *http.Request) error {
 	if clientId == "abcdef" && clientSecret == "12345" {
 		return nil
 	} else {
@@ -130,7 +131,7 @@ func (*TestUserVerifier) ValidateClient(clientId, clientSecret, scope string, re
 }
 
 // Provide additional claims to the token
-func (*TestUserVerifier) AddClaims(credential, tokenID, tokenType, scope string) (map[string]string, error) {
+func (*TestUserVerifier) AddClaims(credential, tokenID, tokenType string, scope []string) (map[string]string, error) {
 	claims := make(map[string]string)
 	claims["customerId"] = "1001"
 	claims["customerData"] = `{"OrderDate":"2016-12-14","OrderId":"9999"}`
@@ -138,18 +139,18 @@ func (*TestUserVerifier) AddClaims(credential, tokenID, tokenType, scope string)
 }
 
 // Optionally store the token Id generated for the user
-func (*TestUserVerifier) StoreTokenId(credential, tokenID, refreshTokenID, tokenType string) error {
+func (*TestUserVerifier) StoreTokenId(credential, tokenID, tokenType string) error {
 	return nil
 }
 
 // Provide additional information to the token response
-func (*TestUserVerifier) AddProperties(credential, tokenID, tokenType, scope string) (map[string]string, error) {
+func (*TestUserVerifier) AddProperties(credential, tokenID, tokenType string, scope []string) (map[string]string, error) {
 	props := make(map[string]string)
 	props["customerName"] = "Gopher"
 	return props, nil
 }
 
 // Validate token Id
-func (*TestUserVerifier) ValidateTokenId(credential, tokenID, refreshTokenID, tokenType string) error {
+func (*TestUserVerifier) ValidateTokenId(credential, tokenID, tokenType string) error {
 	return nil
 }

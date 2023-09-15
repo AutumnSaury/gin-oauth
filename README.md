@@ -3,9 +3,7 @@ OAuth 2.0 Authorization Server &amp; Authorization Middleware for [Gin-Gonic](ht
 
 This library offers an OAuth 2.0 Authorization Server based on Gin-Gonic and an Authorization Middleware usable in Resource Servers developed with Gin-Gonic.
 
-
-## Build status
-[![Build Status](https://travis-ci.org/maxzerbini/oauth.svg?branch=master)](https://travis-ci.org/maxzerbini/oauth)
+This repository is forked from [maxzerbini/oauth](https://github.com/autumnsaury/gin-oauth), making it Go Module compatable and adding built-in JWT to it.
 
 ## Authorization Server
 The Authorization Server is implemented by the struct _OAuthBearerServer_ that manages two grant types of authorizations (password and client_credentials). 
@@ -25,11 +23,6 @@ If authorization token will expire, the client can regenerate the token calling 
 
 ## Authorization Middleware 
 The Gin-Gonic middleware _BearerAuthentication_ intercepts the resource server calls and authorizes only resource requests containing a valid bearer token.
-
-## Token Formatter
-Authorization Server crypts the token using the Token Formatter and Authorization Middleware decrypts the token using the same Token Formatter.
-This library contains a default implementation of the formatter interface called _SHA256RC4TokenSecureFormatter_ based on the algorithms SHA256 and RC4.
-Programmers can develop their Token Formatter implementing the interface _TokenSecureFormatter_ and this is really recommended before publishing the API in a production environment. 
 
 ## Credentials Verifier
 The interface _CredentialsVerifier_ defines the hooks called during the token generation process.
@@ -56,6 +49,7 @@ func main() {
 
     s := oauth.NewOAuthBearerServer(
 		"mySecretKey-10101",
+		time.Hour*24*14,
 		time.Second*120,
 		&TestUserVerifier{},
 		nil)
@@ -65,7 +59,7 @@ func main() {
 	router.Run(":9090")
 }
 ```
-See [/test/authserver/main.go](https://github.com/maxzerbini/oauth/blob/master/test/authserver/main.go) for the full example.
+See [/test/authserver/main.go](https://github.com/autumnsaury/gin-oauth/blob/master/test/authserver/main.go) for the full example.
 
 ## Authorization Middleware usage example
 This snippet shows how to use the middleware
@@ -77,9 +71,9 @@ This snippet shows how to use the middleware
 	authorized.GET("/customers", GetCustomers)
 	authorized.GET("/customers/:id/orders", GetOrders)
 ```
-See [/test/resourceserver/main.go](https://github.com/maxzerbini/oauth/blob/master/test/resourceserver/main.go) for the full example.
+See [/test/resourceserver/main.go](https://github.com/autumnsaury/gin-oauth/blob/master/test/resourceserver/main.go) for the full example.
 
-Note that the authorization server and the authorization middleware are both using the same token formatter and the same secret key for encryption/decryption.
+Note that the authorization server and the authorization middleware are both using the same token signingMethod and the same secret key for encryption/decryption.
 
 ## Note
 This master branch introduces breaking changes in the interface CredentialsVerifier methods _ValidateUser_, _ValidateClient_ and _AddClaims_. Refer to v1 branch for the previous implementation.
@@ -90,4 +84,4 @@ Updated server implementation in v3 due to go.uuid library change.
 - [OAuth 2.0 Bearer Token Usage RFC](https://tools.ietf.org/html/rfc6750)
 
 ## License
-[MIT](https://github.com/maxzerbini/oauth/blob/master/LICENSE)
+[MIT](https://github.com/autumnsaury/gin-oauth/blob/master/LICENSE)

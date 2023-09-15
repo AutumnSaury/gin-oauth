@@ -1,34 +1,37 @@
 package main
 
 import (
+	"errors"
+	"slices"
+
+	oauth "github.com/autumnsaury/gin-oauth"
+	cors "github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/maxzerbini/oauth"
-	cors "gopkg.in/gin-contrib/cors.v1"
+	"github.com/golang-jwt/jwt"
 )
 
 /*
-   Resource Server Example
+	   Resource Server Example
 
-	Get Customers
+		Get Customers
 
-		GET http://localhost:3200/customers
-		User-Agent: Fiddler
-		Host: localhost:3200
-		Content-Length: 0
-		Content-Type: application/json
-		Authorization: Bearer {access_token}
+			GET http://localhost:3200/customers
+			User-Agent: Fiddler
+			Host: localhost:3200
+			Content-Length: 0
+			Content-Type: application/json
+			Authorization: Bearer {access_token}
 
-	Get Orders
+		Get Orders
 
-		GET http://localhost:3200/customers/12345/orders
-		User-Agent: Fiddler
-		Host: localhost:3200
-		Content-Length: 0
-		Content-Type: application/json
-		Authorization: Bearer {access_token}
+			GET http://localhost:3200/customers/12345/orders
+			User-Agent: Fiddler
+			Host: localhost:3200
+			Content-Length: 0
+			Content-Type: application/json
+			Authorization: Bearer {access_token}
 
-	{access_token} is produced by the Authorization Server response (see example /test/authserver).
-
+		{access_token} is produced by the Authorization Server response (see example /test/authserver).
 */
 func main() {
 	router := gin.New()
@@ -44,7 +47,7 @@ func registerAPI(router *gin.Engine) {
 
 	authorized := router.Group("/")
 	// use the Bearer Athentication middleware
-	authorized.Use(oauth.Authorize("mySecretKey-10101", nil))
+	authorized.Use(oauth.Authorize("mySecretKey-10101", jwt.SigningMethodHS256, TokenValidator{[]string{"user"}}))
 
 	authorized.GET("/customers", GetCustomers)
 	authorized.GET("/customers/:id/orders", GetOrders)
@@ -68,4 +71,17 @@ func GetOrders(c *gin.Context) {
 		"OrderId":         "100234",
 		"TotalOrderItems": "199",
 	})
+}
+
+type TokenValidator struct {
+	requiredScopes []string
+}
+
+func (tv TokenValidator) ValidateAccessToken(t *oauth.Token) error {
+	for _, s := range tv.requiredScopes {
+		if !slices.Contains(t.Scope, s) {
+			return errors.New("permission denied")
+		}
+	}
+	return nil
 }
