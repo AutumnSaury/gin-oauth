@@ -63,27 +63,11 @@ var (
 		NoCache:          true,
 	}
 
-	ErrInvalidScope = OauthErrorResponse{
-		ErrorName:        "invalid_scope",
-		ErrorDescription: "you requested for an invalid scope",
-		Header:           "Bearer",
-		Status:           http.StatusBadRequest,
-		NoCache:          true,
-	}
-
 	ErrInvalidClient = OauthErrorResponse{
 		ErrorName:        "invalid_client",
 		ErrorDescription: "invalid client id or secret",
 		Header:           "Bearer",
 		Status:           http.StatusUnauthorized,
-		NoCache:          true,
-	}
-
-	ErrTokenIdStorageFail = OauthErrorResponse{
-		ErrorName:        "server_error",
-		ErrorDescription: "failed to store token id",
-		Header:           "Bearer",
-		Status:           http.StatusInternalServerError,
 		NoCache:          true,
 	}
 
@@ -110,13 +94,6 @@ var (
 		Status:           http.StatusUnauthorized,
 	}
 
-	ErrTokenUsedBeforeIssued = OauthErrorResponse{
-		ErrorName:        "invalid_token",
-		ErrorDescription: "the token is not yet issued",
-		Header:           "Bearer",
-		Status:           http.StatusUnauthorized,
-	}
-
 	ErrTokenUsedBeforeValid = OauthErrorResponse{
 		ErrorName:        "invalid_token",
 		ErrorDescription: "the token is not valid yet",
@@ -131,10 +108,27 @@ var (
 		Status:           http.StatusUnauthorized,
 	}
 
+	// Unused in the lib, but you may use them in your validators
+
 	ErrInsufficientScope = OauthErrorResponse{
 		ErrorName:        "insufficient_scope",
 		ErrorDescription: "the request requires higher privileges than provided by the access token",
 		Header:           "Bearer",
+		Status:           http.StatusForbidden,
+	}
+
+	ErrTokenUsedBeforeIssued = OauthErrorResponse{
+		ErrorName:        "invalid_token",
+		ErrorDescription: "the token is not yet issued",
+		Header:           "Bearer",
 		Status:           http.StatusUnauthorized,
+	}
+
+	ErrInvalidScope = OauthErrorResponse{
+		ErrorName:        "invalid_scope",
+		ErrorDescription: "you requested for an invalid scope",
+		Header:           "Bearer",
+		Status:           http.StatusBadRequest,
+		NoCache:          true,
 	}
 )
