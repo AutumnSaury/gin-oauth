@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -65,13 +64,13 @@ func (ba *BearerAuthentication) validateAccessToken(token string) (*Token, error
 	t, err := jwt.ParseWithClaims(token, &Token{},
 		func(token *jwt.Token) (interface{}, error) {
 			if token.Method != ba.signingMethod {
-				return nil, errors.New("invalid signing method")
+				return nil, ErrInvalidSigningMethod
 			}
 
 			if c, ok := token.Claims.(*Token); !ok && !token.Valid {
-				return nil, errors.New("invalid token")
+				return nil, ErrTokenInvalid
 			} else if c.ForRefresh {
-				return nil, errors.New("not access token")
+				return nil, ErrNotAccessToken
 			}
 
 			return []byte(ba.secretKey), nil
@@ -84,15 +83,15 @@ func (ba *BearerAuthentication) validateAccessToken(token string) (*Token, error
 // Check header and token.
 func (ba *BearerAuthentication) checkAuthorizationHeader(auth string) (t *Token, err error) {
 	if len(auth) < 7 {
-		return nil, errors.New("invalid bearer authorization header")
+		return nil, ErrInvalidAuthenticationScheme
 	}
 	authType := strings.ToLower(auth[:6])
 	if authType != "bearer" {
-		return nil, errors.New("invalid bearer authorization header")
+		return nil, ErrInvalidAuthenticationScheme
 	}
 	token, err := ba.validateAccessToken(auth[7:])
 	if err != nil {
-		return nil, errors.New("invalid token")
+		return nil, err
 	}
 
 	return token, nil

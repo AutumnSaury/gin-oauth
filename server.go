@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -77,13 +76,8 @@ func (s *OAuthBearerServer) UserCredentials(ctx *gin.Context) {
 	password := ctx.PostForm("password")
 	scope := ctx.PostForm("scope")
 	if username == "" || password == "" {
-		// get username and password from basic authorization header
-		var err error
-		username, password, err = GetBasicAuthentication(ctx)
-		if err != nil {
-			ctx.JSON(http.StatusUnauthorized, "Not authorized")
-			return
-		}
+		ctx.JSON(http.StatusUnauthorized, "Not authorized")
+		return
 	}
 	// grant_type refresh_token
 	refreshToken := ctx.PostForm("refresh_token")
@@ -98,13 +92,8 @@ func (s *OAuthBearerServer) ClientCredentials(ctx *gin.Context) {
 	clientId := ctx.PostForm("client_id")
 	clientSecret := ctx.PostForm("client_secret")
 	if clientId == "" || clientSecret == "" {
-		// get clientId and secret from basic authorization header
-		var err error
-		clientId, clientSecret, err = GetBasicAuthentication(ctx)
-		if err != nil {
-			ctx.JSON(http.StatusUnauthorized, "Not authorized")
-			return
-		}
+		ctx.JSON(http.StatusUnauthorized, "Not authorized")
+		return
 	}
 	scope := ctx.PostForm("scope")
 	// grant_type refresh_token
@@ -123,13 +112,8 @@ func (s *OAuthBearerServer) AuthorizationCode(ctx *gin.Context) {
 	redirectURI := ctx.PostForm("redirect_uri") // not mandatory
 	scope := ctx.PostForm("scope")              // not mandatory
 	if clientId == "" {
-		// get clientId and secret from basic authorization header
-		var err error
-		clientId, clientSecret, err = GetBasicAuthentication(ctx)
-		if err != nil {
-			ctx.JSON(http.StatusUnauthorized, "Not authorized")
-			return
-		}
+		ctx.JSON(http.StatusUnauthorized, "Not authorized")
+		return
 	}
 	status, resp := s.generateTokenResponse(grantType, clientId, clientSecret, "", scope, code, redirectURI, ctx.Request)
 	ctx.JSON(status, resp)
@@ -320,13 +304,13 @@ func (s *OAuthBearerServer) validateRefreshToken(token string) (*Token, error) {
 	t, err := jwt.ParseWithClaims(token, &Token{},
 		func(token *jwt.Token) (interface{}, error) {
 			if token.Method != s.signingMethod {
-				return nil, errors.New("invalid signing method")
+				return nil, ErrInvalidSigningMethod
 			}
 
 			if c, ok := token.Claims.(*Token); !ok && !token.Valid {
-				return nil, errors.New("invalid token")
+				return nil, ErrTokenInvalid
 			} else if !c.ForRefresh {
-				return nil, errors.New("not refresh token")
+				return nil, ErrNotRefreshToken
 			}
 
 			return []byte(s.secretKey), nil

@@ -1,14 +1,7 @@
 package oauth
 
 import (
-	"errors"
 	"time"
-)
-
-var (
-	ErrTokenUsedBeforeIssued = errors.New("Token used before issued")
-	ErrTokenUsedBeforeValid  = errors.New("Token is not valid yet")
-	ErrTokenExpire           = errors.New("Token expired")
 )
 
 // TokenResponse is the authorization server response
