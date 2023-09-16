@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -45,11 +44,11 @@ func (ba *BearerAuthentication) Authorize(ctx *gin.Context) {
 	token, err := ba.checkAuthorizationHeader(auth)
 
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, "Not authorized: "+err.Error())
-		ctx.AbortWithStatus(401)
+		ctx.Error(err)
+		ctx.Abort()
 	} else if err := ba.customValidator.ValidateAccessToken(token, ctx); err != nil {
-		ctx.JSON(http.StatusUnauthorized, "Not authorized: "+err.Error())
-		ctx.AbortWithStatus(401)
+		ctx.Error(err)
+		ctx.Abort()
 	} else {
 		ctx.Set("oauth.audience", token.Audience)
 		ctx.Set("oauth.claims", token.Claims)
@@ -64,7 +63,7 @@ func (ba *BearerAuthentication) validateAccessToken(token string) (*Token, error
 	t, err := jwt.ParseWithClaims(token, &Token{},
 		func(token *jwt.Token) (interface{}, error) {
 			if token.Method != ba.signingMethod {
-				return nil, ErrInvalidSigningMethod
+				return nil, ErrInvalidAccessTokenSigningMethod
 			}
 
 			if c, ok := token.Claims.(*Token); !ok && !token.Valid {

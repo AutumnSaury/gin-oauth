@@ -76,13 +76,17 @@ func (s *OAuthBearerServer) UserCredentials(ctx *gin.Context) {
 	password := ctx.PostForm("password")
 	scope := ctx.PostForm("scope")
 	if username == "" || password == "" {
-		ctx.JSON(http.StatusUnauthorized, "Not authorized")
+		ctx.Error(ErrInvalidGrant)
 		return
 	}
 	// grant_type refresh_token
 	refreshToken := ctx.PostForm("refresh_token")
-	code, resp := s.generateTokenResponse(grantType, username, password, refreshToken, scope, "", "", ctx.Request)
-	ctx.JSON(code, resp)
+	resp, err := s.generateTokenResponse(grantType, username, password, refreshToken, scope, "", "", ctx.Request)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+	ctx.JSON(http.StatusOK, resp)
 }
 
 // ClientCredentials manages client credentials grant type requests
@@ -92,14 +96,18 @@ func (s *OAuthBearerServer) ClientCredentials(ctx *gin.Context) {
 	clientId := ctx.PostForm("client_id")
 	clientSecret := ctx.PostForm("client_secret")
 	if clientId == "" || clientSecret == "" {
-		ctx.JSON(http.StatusUnauthorized, "Not authorized")
+		ctx.Error(ErrInvalidGrant)
 		return
 	}
 	scope := ctx.PostForm("scope")
 	// grant_type refresh_token
 	refreshToken := ctx.PostForm("refresh_token")
-	code, resp := s.generateTokenResponse(grantType, clientId, clientSecret, refreshToken, scope, "", "", ctx.Request)
-	ctx.JSON(code, resp)
+	resp, err := s.generateTokenResponse(grantType, clientId, clientSecret, refreshToken, scope, "", "", ctx.Request)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+	ctx.JSON(http.StatusOK, resp)
 }
 
 // AuthorizationCode manages authorization code grant type requests for the phase two of the authorization process
@@ -112,15 +120,19 @@ func (s *OAuthBearerServer) AuthorizationCode(ctx *gin.Context) {
 	redirectURI := ctx.PostForm("redirect_uri") // not mandatory
 	scope := ctx.PostForm("scope")              // not mandatory
 	if clientId == "" {
-		ctx.JSON(http.StatusUnauthorized, "Not authorized")
+		ctx.Error(ErrInvalidClient)
 		return
 	}
-	status, resp := s.generateTokenResponse(grantType, clientId, clientSecret, "", scope, code, redirectURI, ctx.Request)
-	ctx.JSON(status, resp)
+	resp, err := s.generateTokenResponse(grantType, clientId, clientSecret, "", scope, code, redirectURI, ctx.Request)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+	ctx.JSON(http.StatusOK, resp)
 }
 
 // Generate token response
-func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret, refreshToken, unsplitScope, code, redirectURI string, req *http.Request) (int, any) {
+func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret, refreshToken, unsplitScope, code, redirectURI string, req *http.Request) (*TokenResponse, error) {
 	var scope []string
 
 	if unsplitScope == "" {
@@ -138,21 +150,21 @@ func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret,
 				// Store token id
 				err = s.verifier.StoreTokenId(credential, token.Id, token.TokenType)
 				if err != nil {
-					return http.StatusInternalServerError, "Storing Token Id failed"
+					return nil, err
 				}
 				resp, err := s.cryptTokens(token, refresh)
 				if err == nil {
-					return http.StatusOK, resp
+					return resp, nil
 				} else {
-					return http.StatusInternalServerError, "Token generation failed, check security provider"
+					return nil, err
 				}
 			} else {
-				return http.StatusInternalServerError, "Token generation failed, check claims"
+				return nil, err
 			}
 
 		} else {
 			//not autorized
-			return http.StatusUnauthorized, "Not authorized"
+			return nil, err
 		}
 	} else if grantType == "client_credentials" {
 		err := s.verifier.ValidateClient(credential, secret, scope, req)
@@ -162,20 +174,20 @@ func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret,
 				// Store token id
 				err = s.verifier.StoreTokenId(credential, token.Id, token.TokenType)
 				if err != nil {
-					return http.StatusInternalServerError, "Storing Token Id failed"
+					return nil, err
 				}
 				resp, err := s.cryptTokens(token, refresh)
 				if err == nil {
-					return http.StatusOK, resp
+					return resp, nil
 				} else {
-					return http.StatusInternalServerError, "Token generation failed, check security provider"
+					return nil, err
 				}
 			} else {
-				return http.StatusInternalServerError, "Token generation failed, check claims"
+				return nil, err
 			}
 		} else {
 			//not autorized
-			return http.StatusUnauthorized, "Not authorized"
+			return nil, err
 		}
 	} else if grantType == "authorization_code" {
 		if codeVerifier, ok := s.verifier.(AuthorizationCodeVerifier); ok {
@@ -186,24 +198,24 @@ func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret,
 					// Store token id
 					err = s.verifier.StoreTokenId(user, token.Id, token.TokenType)
 					if err != nil {
-						return http.StatusInternalServerError, "Storing Token Id failed"
+						return nil, err
 					}
 					resp, err := s.cryptTokens(token, refresh)
 					if err == nil {
-						return http.StatusOK, resp
+						return resp, nil
 					} else {
-						return http.StatusInternalServerError, "Token generation failed, check security provider"
+						return nil, err
 					}
 				} else {
-					return http.StatusInternalServerError, "Token generation failed, check claims"
+					return nil, err
 				}
 			} else {
 				//not autorized
-				return http.StatusUnauthorized, "Not authorized"
+				return nil, err
 			}
 		} else {
 			//not autorized
-			return http.StatusUnauthorized, "Not authorized, grant type not supported"
+			return nil, ErrUnsupportedGrantType
 		}
 	} else if grantType == "refresh_token" {
 		// refresh token
@@ -218,28 +230,28 @@ func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret,
 					// Store token id
 					err = s.verifier.StoreTokenId(refresh.Audience, token.Id, token.TokenType)
 					if err != nil {
-						return http.StatusInternalServerError, "Storing Token Id failed"
+						return nil, err
 					}
 					resp, err := s.cryptTokens(token, refresh)
 					if err == nil {
-						return http.StatusOK, resp
+						return resp, nil
 					} else {
-						return http.StatusInternalServerError, "Token generation failed"
+						return nil, err
 					}
 				} else {
-					return http.StatusInternalServerError, "Token generation failed"
+					return nil, err
 				}
 			} else {
 				//not autorized invalid token Id
-				return http.StatusUnauthorized, "Not authorized invalid token"
+				return nil, err
 			}
 		} else {
 			//not autorized
-			return http.StatusUnauthorized, "Not authorized"
+			return nil, err
 		}
 	} else {
 		// Invalid request
-		return http.StatusBadRequest, "Invalid grant_type"
+		return nil, ErrInvalidGrant
 	}
 }
 
@@ -304,7 +316,7 @@ func (s *OAuthBearerServer) validateRefreshToken(token string) (*Token, error) {
 	t, err := jwt.ParseWithClaims(token, &Token{},
 		func(token *jwt.Token) (interface{}, error) {
 			if token.Method != s.signingMethod {
-				return nil, ErrInvalidSigningMethod
+				return nil, ErrInvalidRefreshTokenSigningMethod
 			}
 
 			if c, ok := token.Claims.(*Token); !ok && !token.Valid {
