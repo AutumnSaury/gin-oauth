@@ -15,7 +15,8 @@ func init() {
 		time.Second*60,
 		time.Hour*24*14,
 		&TestUserVerifier{},
-		nil)
+		nil,
+	)
 }
 
 func TestGenerateTokensByUsername(t *testing.T) {

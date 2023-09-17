@@ -59,9 +59,10 @@ func registerAPI(router *gin.Engine) {
 		time.Second*120,
 		time.Hour*24*14,
 		&TestUserVerifier{},
-		nil)
-	router.POST("/token", s.UserCredentials)
-	router.POST("/auth", s.ClientCredentials)
+		nil,
+	)
+	router.POST("/token", s.GetOAuthServer(oauth.PasswordWithRefreshToken))
+	router.POST("/auth", s.GetOAuthServer(oauth.ClientCredentialsWithRefreshToken))
 }
 
 // TestUserVerifier provides user credentials verifier for testing.

@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,7 +12,14 @@ import (
 )
 
 const (
-	TOKEN_TYPE = "Bearer"
+	TokenType = "Bearer"
+)
+
+var (
+	AvailableGrantTypes               = []string{"password", "client_credentials", "authorization_code", "refresh_token"}
+	PasswordWithRefreshToken          = []string{"password", "refresh_token"}
+	ClientCredentialsWithRefreshToken = []string{"client_credentials", "refresh_token"}
+	AuthorizationCodeOnly             = []string{"authorization_code"}
 )
 
 // CredentialsVerifier defines the interface of the user and client credentials verifier.
@@ -41,8 +49,8 @@ type AuthorizationCodeVerifier interface {
 // OAuthBearerServer is the OAuth 2 Bearer Server implementation.
 type OAuthBearerServer struct {
 	secretKey     string
-	TokenTTL      time.Duration
-	RefreshTTL    time.Duration
+	tokenTTL      time.Duration
+	refreshTTL    time.Duration
 	verifier      CredentialsVerifier
 	signingMethod jwt.SigningMethod
 }
@@ -62,80 +70,99 @@ func NewOAuthBearerServer(
 
 	obs := &OAuthBearerServer{
 		secretKey:     secretKey,
-		TokenTTL:      ttl,
-		RefreshTTL:    refreshTtl,
+		tokenTTL:      ttl,
+		refreshTTL:    refreshTtl,
 		verifier:      verifier,
 		signingMethod: signingMethod,
 	}
 	return obs
 }
 
-// UserCredentials manages password grant type requests
-func (s *OAuthBearerServer) UserCredentials(ctx *gin.Context) {
-	grantType := ctx.PostForm("grant_type")
-	// grant_type password variables
-	username := ctx.PostForm("username")
-	password := ctx.PostForm("password")
-	scope := ctx.PostForm("scope")
-	if username == "" || password == "" {
-		ctx.Error(ErrInvalidGrant)
-		return
+// GetOAuthServer returns the OAuth 2.0 server handler
+func (s *OAuthBearerServer) GetOAuthServer(allowedGrantTypes []string) gin.HandlerFunc {
+
+	if len(allowedGrantTypes) != 0 {
+		for _, gt := range allowedGrantTypes {
+			if !slices.Contains(AvailableGrantTypes, gt) {
+				panic("Invalid grant type: " + gt)
+			}
+		}
+	} else {
+		panic("No grant type provided")
 	}
-	// grant_type refresh_token
-	refreshToken := ctx.PostForm("refresh_token")
-	resp, err := s.generateTokenResponse(grantType, username, password, refreshToken, scope, "", "", ctx.Request)
-	if err != nil {
-		ctx.Error(err)
-		return
+
+	return func(ctx *gin.Context) {
+		grantType := ctx.PostForm("grant_type")
+
+		if !slices.Contains(allowedGrantTypes, grantType) {
+			ctx.Error(ErrUnsupportedGrantType)
+			return
+		}
+
+		switch grantType {
+		case "password":
+			username := ctx.PostForm("username")
+			password := ctx.PostForm("password")
+			scope := ctx.PostForm("scope")
+			if username == "" || password == "" {
+				ctx.Error(ErrInvalidGrant)
+				return
+			}
+			resp, err := s.generateTokenResponseForPasswordGrant(username, password, scope, ctx.Request)
+			if err != nil {
+				ctx.Error(err)
+				return
+			}
+			ctx.JSON(http.StatusOK, resp)
+
+		case "client_credentials":
+			clientId := ctx.PostForm("client_id")
+			clientSecret := ctx.PostForm("client_secret")
+			if clientId == "" || clientSecret == "" {
+				ctx.Error(ErrInvalidGrant)
+				return
+			}
+			scope := ctx.PostForm("scope")
+			resp, err := s.generateTokenResponseForClientCredentialsGrant(clientId, clientSecret, scope, ctx.Request)
+			if err != nil {
+				ctx.Error(err)
+				return
+			}
+			ctx.JSON(http.StatusOK, resp)
+		case "authorization_code":
+			clientId := ctx.PostForm("client_id")
+			clientSecret := ctx.PostForm("client_secret") // not mandatory
+			code := ctx.PostForm("code")
+			redirectURI := ctx.PostForm("redirect_uri") // not mandatory
+			scope := ctx.PostForm("scope")              // not mandatory
+			if clientId == "" {
+				ctx.Error(ErrInvalidClient)
+				return
+			}
+			resp, err := s.generateTokenResponseForAuthorizationCodeGrant(clientId, clientSecret, scope, code, redirectURI, ctx.Request)
+			if err != nil {
+				ctx.Error(err)
+				return
+			}
+			ctx.JSON(http.StatusOK, resp)
+		case "refresh_token":
+			refreshToken := ctx.PostForm("refresh_token")
+			resp, err := s.generateTokenResponseForRefreshGrant(refreshToken)
+			if err != nil {
+				ctx.Error(err)
+				return
+			}
+			ctx.JSON(http.StatusOK, resp)
+		default:
+			ctx.Error(ErrUnsupportedGrantType)
+			return
+		}
 	}
-	ctx.JSON(http.StatusOK, resp)
 }
 
-// ClientCredentials manages client credentials grant type requests
-func (s *OAuthBearerServer) ClientCredentials(ctx *gin.Context) {
-	grantType := ctx.PostForm("grant_type")
-	// grant_type client_credentials variables
-	clientId := ctx.PostForm("client_id")
-	clientSecret := ctx.PostForm("client_secret")
-	if clientId == "" || clientSecret == "" {
-		ctx.Error(ErrInvalidGrant)
-		return
-	}
-	scope := ctx.PostForm("scope")
-	// grant_type refresh_token
-	refreshToken := ctx.PostForm("refresh_token")
-	resp, err := s.generateTokenResponse(grantType, clientId, clientSecret, refreshToken, scope, "", "", ctx.Request)
-	if err != nil {
-		ctx.Error(err)
-		return
-	}
-	ctx.JSON(http.StatusOK, resp)
-}
-
-// AuthorizationCode manages authorization code grant type requests for the phase two of the authorization process
-func (s *OAuthBearerServer) AuthorizationCode(ctx *gin.Context) {
-	grantType := ctx.PostForm("grant_type")
-	// grant_type client_credentials variables
-	clientId := ctx.PostForm("client_id")
-	clientSecret := ctx.PostForm("client_secret") // not mandatory
-	code := ctx.PostForm("code")
-	redirectURI := ctx.PostForm("redirect_uri") // not mandatory
-	scope := ctx.PostForm("scope")              // not mandatory
-	if clientId == "" {
-		ctx.Error(ErrInvalidClient)
-		return
-	}
-	resp, err := s.generateTokenResponse(grantType, clientId, clientSecret, "", scope, code, redirectURI, ctx.Request)
-	if err != nil {
-		ctx.Error(err)
-		return
-	}
-	ctx.JSON(http.StatusOK, resp)
-}
-
-// TokenRevocation manages token revocation requests, it revokes a valid token, along with all tokens share the same id with it.
+// TokenRevocationServer manages token revocation requests, it revokes a valid token, along with all tokens share the same id with it.
 // We broke the standard to make a 4xx response when the client intend to revoke an invalid token.
-func (s *OAuthBearerServer) TokenRevocation(ctx *gin.Context) {
+func (s *OAuthBearerServer) TokenRevocationServer(ctx *gin.Context) {
 	token := ctx.PostForm("token")
 	if token == "" {
 		ctx.Error(ErrInvalidRevocationRequest)
@@ -210,24 +237,126 @@ func (s *OAuthBearerServer) TokenRevocation(ctx *gin.Context) {
 	}
 }
 
-// Generate token response
-func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret, refreshToken, unsplitScope, code, redirectURI string, req *http.Request) (*TokenResponse, error) {
+// Generate token response for refresh token grant flow
+func (s *OAuthBearerServer) generateTokenResponseForRefreshGrant(refreshToken string) (*TokenResponse, error) {
+	refresh, err := s.validateRefreshToken(refreshToken)
+
+	if err == nil {
+		err = s.verifier.ValidateTokenId(refresh.Audience, refresh.Id, refresh.TokenType)
+		if err == nil {
+			// generate new token
+			token, refresh, err := s.generateTokens(refresh.Audience, refresh.TokenType, refresh.Scope)
+			if err == nil {
+				// Store token id
+				err = s.verifier.StoreTokenId(refresh.Audience, token.Id, token.TokenType)
+				if err != nil {
+					return nil, err
+				}
+				resp, err := s.cryptTokens(token, refresh)
+				if err == nil {
+					return resp, nil
+				} else {
+					return nil, err
+				}
+			} else {
+				return nil, err
+			}
+		} else {
+			//not autorized invalid token Id
+			return nil, err
+		}
+	} else {
+		//not autorized
+		return nil, err
+	}
+}
+
+// Generate token response for password grant flow
+func (s *OAuthBearerServer) generateTokenResponseForPasswordGrant(credential string, password string, scopeString string, req *http.Request) (*TokenResponse, error) {
 	var scope []string
 
-	if unsplitScope == "" {
+	if scopeString == "" {
 		scope = make([]string, 0)
 	} else {
-		scope = strings.Split(unsplitScope, " ")
+		scope = strings.Split(scopeString, " ")
 	}
 
-	// check grant_Type
-	if grantType == "password" {
-		err := s.verifier.ValidateUser(credential, secret, scope, req)
+	err := s.verifier.ValidateUser(credential, password, scope, req)
+	if err == nil {
+		token, refresh, err := s.generateTokens(credential, "U", scope)
 		if err == nil {
-			token, refresh, err := s.generateTokens(credential, "U", scope)
+			// Store token id
+			err = s.verifier.StoreTokenId(credential, token.Id, token.TokenType)
+			if err != nil {
+				return nil, err
+			}
+			resp, err := s.cryptTokens(token, refresh)
+			if err == nil {
+				return resp, nil
+			} else {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+
+	} else {
+		//not autorized
+		return nil, err
+	}
+}
+
+// Generate token response for client credentials grant flow
+func (s *OAuthBearerServer) generateTokenResponseForClientCredentialsGrant(credential string, secret string, scopeString string, req *http.Request) (*TokenResponse, error) {
+	var scope []string
+
+	if scopeString == "" {
+		scope = make([]string, 0)
+	} else {
+		scope = strings.Split(scopeString, " ")
+	}
+
+	err := s.verifier.ValidateClient(credential, secret, scope, req)
+	if err == nil {
+		token, refresh, err := s.generateTokens(credential, "C", scope)
+		if err == nil {
+			// Store token id
+			err = s.verifier.StoreTokenId(credential, token.Id, token.TokenType)
+			if err != nil {
+				return nil, err
+			}
+			resp, err := s.cryptTokens(token, refresh)
+			if err == nil {
+				return resp, nil
+			} else {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	} else {
+		//not autorized
+		return nil, err
+	}
+}
+
+// Generate token response for authorization code grant flow
+func (s *OAuthBearerServer) generateTokenResponseForAuthorizationCodeGrant(credential string, secret string, scopeString string, code string, redirectURI string, req *http.Request) (*TokenResponse, error) {
+	var scope []string
+
+	if scopeString == "" {
+		scope = make([]string, 0)
+	} else {
+		scope = strings.Split(scopeString, " ")
+	}
+
+	if codeVerifier, ok := s.verifier.(AuthorizationCodeVerifier); ok {
+		user, err := codeVerifier.ValidateCode(credential, secret, code, redirectURI, req)
+		if err == nil {
+			token, refresh, err := s.generateTokens(user, "A", scope)
 			if err == nil {
 				// Store token id
-				err = s.verifier.StoreTokenId(credential, token.Id, token.TokenType)
+				err = s.verifier.StoreTokenId(user, token.Id, token.TokenType)
 				if err != nil {
 					return nil, err
 				}
@@ -238,90 +367,6 @@ func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret,
 					return nil, err
 				}
 			} else {
-				return nil, err
-			}
-
-		} else {
-			//not autorized
-			return nil, err
-		}
-	} else if grantType == "client_credentials" {
-		err := s.verifier.ValidateClient(credential, secret, scope, req)
-		if err == nil {
-			token, refresh, err := s.generateTokens(credential, "C", scope)
-			if err == nil {
-				// Store token id
-				err = s.verifier.StoreTokenId(credential, token.Id, token.TokenType)
-				if err != nil {
-					return nil, err
-				}
-				resp, err := s.cryptTokens(token, refresh)
-				if err == nil {
-					return resp, nil
-				} else {
-					return nil, err
-				}
-			} else {
-				return nil, err
-			}
-		} else {
-			//not autorized
-			return nil, err
-		}
-	} else if grantType == "authorization_code" {
-		if codeVerifier, ok := s.verifier.(AuthorizationCodeVerifier); ok {
-			user, err := codeVerifier.ValidateCode(credential, secret, code, redirectURI, req)
-			if err == nil {
-				token, refresh, err := s.generateTokens(user, "A", scope)
-				if err == nil {
-					// Store token id
-					err = s.verifier.StoreTokenId(user, token.Id, token.TokenType)
-					if err != nil {
-						return nil, err
-					}
-					resp, err := s.cryptTokens(token, refresh)
-					if err == nil {
-						return resp, nil
-					} else {
-						return nil, err
-					}
-				} else {
-					return nil, err
-				}
-			} else {
-				//not autorized
-				return nil, err
-			}
-		} else {
-			//not autorized
-			return nil, ErrUnsupportedGrantType
-		}
-	} else if grantType == "refresh_token" {
-		// refresh token
-		refresh, err := s.validateRefreshToken(refreshToken)
-
-		if err == nil {
-			err = s.verifier.ValidateTokenId(refresh.Audience, refresh.Id, refresh.TokenType)
-			if err == nil {
-				// generate new token
-				token, refresh, err := s.generateTokens(refresh.Audience, refresh.TokenType, refresh.Scope)
-				if err == nil {
-					// Store token id
-					err = s.verifier.StoreTokenId(refresh.Audience, token.Id, token.TokenType)
-					if err != nil {
-						return nil, err
-					}
-					resp, err := s.cryptTokens(token, refresh)
-					if err == nil {
-						return resp, nil
-					} else {
-						return nil, err
-					}
-				} else {
-					return nil, err
-				}
-			} else {
-				//not autorized invalid token Id
 				return nil, err
 			}
 		} else {
@@ -329,15 +374,15 @@ func (s *OAuthBearerServer) generateTokenResponse(grantType, credential, secret,
 			return nil, err
 		}
 	} else {
-		// Invalid request
-		return nil, ErrInvalidGrant
+		//not autorized
+		return nil, ErrUnsupportedGrantType
 	}
 }
 
 func (s *OAuthBearerServer) generateTokens(username string, tokenType string, scope []string) (token *Token, refresh *Token, err error) {
 	token = &Token{
 		Audience:   username,
-		ExpiresAt:  time.Now().UTC().Unix() + int64(s.TokenTTL.Seconds()),
+		ExpiresAt:  time.Now().UTC().Unix() + int64(s.tokenTTL.Seconds()),
 		IssuedAt:   time.Now().UTC().Unix(),
 		NotBefore:  time.Now().UTC().Unix(),
 		TokenType:  tokenType,
@@ -359,7 +404,7 @@ func (s *OAuthBearerServer) generateTokens(username string, tokenType string, sc
 	refresh = &Token{
 		Id:         token.Id,
 		Audience:   username,
-		ExpiresAt:  time.Now().UTC().Unix() + int64(s.RefreshTTL.Seconds()),
+		ExpiresAt:  time.Now().UTC().Unix() + int64(s.refreshTTL.Seconds()),
 		IssuedAt:   time.Now().UTC().Unix(),
 		NotBefore:  time.Now().UTC().Unix(),
 		TokenType:  tokenType,
@@ -379,7 +424,7 @@ func (s *OAuthBearerServer) cryptTokens(token *Token, refresh *Token) (resp *Tok
 	if err != nil {
 		return nil, err
 	}
-	resp = &TokenResponse{Token: ctoken, RefreshToken: crefresh, TokenType: TOKEN_TYPE, ExpiresIn: (int64)(s.TokenTTL / time.Second)}
+	resp = &TokenResponse{Token: ctoken, RefreshToken: crefresh, TokenType: TokenType, ExpiresIn: (int64)(s.tokenTTL / time.Second)}
 
 	if s.verifier != nil {
 		// add properties
