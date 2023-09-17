@@ -28,6 +28,8 @@ type CredentialsVerifier interface {
 	AddProperties(credential, tokenID, tokenType string, scope []string) (map[string]string, error)
 	// Optionally validate previously stored tokenID during refresh request
 	ValidateTokenId(credential, tokenID, tokenType string) error
+	// Optionally revoke a token by it's ID
+	RevokeToken(tokenID string) error
 }
 
 // AuthorizationCodeVerifier defines the interface of the Authorization Code verifier
@@ -129,6 +131,83 @@ func (s *OAuthBearerServer) AuthorizationCode(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, resp)
+}
+
+// TokenRevocation manages token revocation requests, it revokes a valid token, along with all tokens share the same id with it.
+// We broke the standard to make a 4xx response when the client intend to revoke an invalid token.
+func (s *OAuthBearerServer) TokenRevocation(ctx *gin.Context) {
+	token := ctx.PostForm("token")
+	if token == "" {
+		ctx.Error(ErrInvalidRevocationRequest)
+		return
+	}
+
+	hint := ctx.PostForm("token_type_hint")
+
+	if hint != "" && hint != "access_token" && hint != "refresh_token" {
+		ctx.Error(ErrUnsupportedTokenType)
+		return
+	} else if hint == "refresh_token" {
+		tc, err := s.validateRefreshToken(token)
+		if err != nil {
+			ctx.Error(ErrInvalidRevocationRequest)
+			return
+		}
+
+		err = s.verifier.RevokeToken(tc.Id)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		ctx.Status(http.StatusOK)
+	} else if hint == "access_token" {
+		ba := NewBearerAuthentication(s.secretKey, s.signingMethod, nil)
+		tc, err := ba.validateAccessToken(token)
+		if err != nil {
+			ctx.Error(ErrInvalidRevocationRequest)
+			return
+		}
+
+		err = s.verifier.RevokeToken(tc.Id)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+
+		ctx.Status(http.StatusOK)
+	} else {
+		// try to revoke refresh token
+		tc, err := s.validateRefreshToken(token)
+		if err == nil {
+			err = s.verifier.RevokeToken(tc.Id)
+			if err != nil {
+				ctx.Error(err)
+				return
+			}
+			ctx.Status(http.StatusOK)
+		} else if err == ErrNotRefreshToken {
+			// try to revoke access token
+			ba := NewBearerAuthentication(s.secretKey, s.signingMethod, nil)
+			tc, err := ba.validateAccessToken(token)
+			if err == nil {
+				err = s.verifier.RevokeToken(tc.Id)
+				if err != nil {
+					ctx.Error(err)
+					return
+				}
+				ctx.Status(http.StatusOK)
+			} else if err == ErrNotAccessToken {
+				ctx.Error(ErrUnsupportedTokenType)
+				return
+			} else {
+				ctx.Error(err)
+				return
+			}
+		} else {
+			ctx.Error(err)
+			return
+		}
+	}
 }
 
 // Generate token response

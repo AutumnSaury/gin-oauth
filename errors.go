@@ -5,6 +5,8 @@ import (
 )
 
 // OauthErrorResponse is the error response structure.
+// Can be serialized to a valid OAuth2 error response.
+// ErrorNames were error codes defined in RFC6749(https://datatracker.ietf.org/doc/html/rfc6749) at 4.1.2.1, 4.2.2.1 and 5.2.
 // When error occours in parts of this lib, it would be pushed into gin.Context.Errors.
 // Handle them with a custom middleware.
 type OauthErrorResponse struct {
@@ -68,6 +70,19 @@ var (
 		ErrorDescription: "invalid client id or secret",
 		Header:           "Bearer",
 		Status:           http.StatusUnauthorized,
+		NoCache:          true,
+	}
+
+	ErrInvalidRevocationRequest = OauthErrorResponse{
+		ErrorName:        "invalid_request",
+		ErrorDescription: "invalid revocation request",
+		Status:           http.StatusBadRequest,
+	}
+
+	ErrUnsupportedTokenType = OauthErrorResponse{
+		ErrorName:        "unsupported_token_type",
+		ErrorDescription: "unsupported token type",
+		Status:           http.StatusServiceUnavailable,
 		NoCache:          true,
 	}
 

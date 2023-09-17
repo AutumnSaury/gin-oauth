@@ -117,3 +117,7 @@ func (*TestUserVerifier) AddProperties(credential, tokenID, tokenType string, sc
 func (*TestUserVerifier) ValidateTokenId(credential, tokenID, tokenType string) error {
 	return nil
 }
+
+func (*TestUserVerifier) RevokeToken(id string) error {
+	return nil
+}

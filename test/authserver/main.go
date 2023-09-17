@@ -112,3 +112,7 @@ func (*TestUserVerifier) ValidateTokenId(credential, tokenId, tokenType string) 
 func (*TestUserVerifier) ValidateCode(clientID, clientSecret, code, redirectURI string, req *http.Request) (string, error) {
 	return "", nil
 }
+
+func (*TestUserVerifier) RevokeToken(id string) error {
+	return nil
+}
