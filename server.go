@@ -424,7 +424,14 @@ func (s *OAuthBearerServer) cryptTokens(token *Token, refresh *Token) (resp *Tok
 	if err != nil {
 		return nil, err
 	}
-	resp = &TokenResponse{Token: ctoken, RefreshToken: crefresh, TokenType: TokenType, ExpiresIn: (int64)(s.tokenTTL / time.Second)}
+	resp = &TokenResponse{
+		Token:                 ctoken,
+		RefreshToken:          crefresh,
+		TokenType:             TokenType,
+		ExpiresIn:             (int64)(s.tokenTTL / time.Second),
+		RefreshTokenExpiresIn: (int64)(s.refreshTTL / time.Second),
+		Scope:                 strings.Join(token.Scope, ""),
+	}
 
 	if s.verifier != nil {
 		// add properties
