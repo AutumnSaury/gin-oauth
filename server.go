@@ -460,11 +460,13 @@ func (s *OAuthBearerServer) validateRefreshToken(token string) (*Token, error) {
 		},
 	)
 
-	if e, ok := err.(jwt.ValidationError); ok {
-		if errInner, ok := e.Inner.(OauthErrorResponse); ok {
-			return nil, errInner
+	if err != nil {
+		if e, ok := err.(*jwt.ValidationError); ok {
+			if errInner, ok := e.Inner.(OauthErrorResponse); ok {
+				return nil, errInner
+			}
 		}
-	} else if err != nil {
+
 		return nil, ErrRefreshTokenValidationError
 	}
 
