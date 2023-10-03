@@ -76,6 +76,14 @@ func (ba *BearerAuthentication) validateAccessToken(token string) (*Token, error
 		},
 	)
 
+	if e, ok := err.(jwt.ValidationError); ok {
+		if errInner, ok := e.Inner.(OauthErrorResponse); ok {
+			err = errInner
+		} else {
+			err = ErrTokenInvalid
+		}
+	}
+
 	return t.Claims.(*Token), err
 }
 

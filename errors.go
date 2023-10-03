@@ -41,6 +41,14 @@ var (
 		NoCache:          true,
 	}
 
+	ErrInvalidRefreshToken = OauthErrorResponse{
+		ErrorName:        "invalid_request",
+		ErrorDescription: "token provided was not a valid refresh token",
+		Header:           "Bearer",
+		Status:           http.StatusBadRequest,
+		NoCache:          true,
+	}
+
 	ErrInvalidGrant = OauthErrorResponse{
 		ErrorName:        "invalid_grant",
 		ErrorDescription: "invalid password or client_secret",
@@ -119,6 +127,13 @@ var (
 	ErrTokenExpire = OauthErrorResponse{
 		ErrorName:        "invalid_token",
 		ErrorDescription: "the token has expired",
+		Header:           "Bearer",
+		Status:           http.StatusUnauthorized,
+	}
+
+	ErrTokenValidationError = OauthErrorResponse{
+		ErrorName:        "invalid_token",
+		ErrorDescription: "the token is invalid",
 		Header:           "Bearer",
 		Status:           http.StatusUnauthorized,
 	}
