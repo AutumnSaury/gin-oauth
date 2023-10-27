@@ -430,7 +430,7 @@ func (s *OAuthBearerServer) cryptTokens(token *Token, refresh *Token) (resp *Tok
 		TokenType:             TokenType,
 		ExpiresIn:             (int64)(s.tokenTTL / time.Second),
 		RefreshTokenExpiresIn: (int64)(s.refreshTTL / time.Second),
-		Scope:                 strings.Join(token.Scope, ""),
+		Scope:                 strings.Join(token.Scope, " "),
 	}
 
 	if s.verifier != nil {
